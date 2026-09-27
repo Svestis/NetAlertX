@@ -10,6 +10,7 @@
 
 require dirname(__FILE__).'/../templates/globals.php';
 require dirname(__FILE__).'/../templates/skinUI.php';
+require_once dirname(__FILE__).'/app_conf_encode.php';
 
 
 //------------------------------------------------------------------------------
@@ -116,7 +117,7 @@ function saveSettings()
       if ($group == $settingGroup) {
 
           if ($dataType == 'string' ) {
-              $val = encode_single_quotes($settingValue);
+              $val = encode_python_string($settingValue);
               $txt .= $setKey . "='" . $val . "'\n";
           } elseif ($dataType == 'integer') {
               $txt .= $setKey . "=" . $settingValue . "\n";
@@ -137,7 +138,7 @@ function saveSettings()
               // skipping __metadata entries (?)
               if (count($setting) > 3 && is_array($settingValue) == true) {
                   foreach ($settingValue as $val) {
-                      $temp .= "'" . encode_single_quotes($val) . "',";
+                      $temp .= "'" . encode_python_string($val) . "',";
                   }
 
                   $temp = substr_replace($temp, "", -1); // remove last comma ','
@@ -271,11 +272,6 @@ function getSettingValue($setKey) {
   return 'Could not find setting '.$setKey;
 }
 
-// -------------------------------------------------------------------------------------------
-function encode_single_quotes ($val) {
-  $result = str_replace ('\'','{s-quote}',$val);
-  return $result;
-}
 // -------------------------------------------------------------------------------------------
 // Helper function to send notifications via the backend API endpoint
 // -------------------------------------------------------------------------------------------
