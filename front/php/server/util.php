@@ -10,7 +10,6 @@
 
 require dirname(__FILE__).'/../templates/globals.php';
 require dirname(__FILE__).'/../templates/skinUI.php';
-require_once dirname(__FILE__).'/app_conf_encode.php';
 
 
 //------------------------------------------------------------------------------
@@ -272,6 +271,15 @@ function getSettingValue($setKey) {
   return 'Could not find setting '.$setKey;
 }
 
+// -------------------------------------------------------------------------------------------
+/**
+ * Encode a string for use inside a single-quoted Python literal in app.conf.
+ * Doubles backslashes so they round-trip unchanged, and replaces ' with the
+ * legacy {s-quote} placeholder that the backend converts back per use.
+ */
+function encode_python_string($val) {
+  return str_replace(['\\', '\''], ['\\\\', '{s-quote}'], $val);
+}
 // -------------------------------------------------------------------------------------------
 // Helper function to send notifications via the backend API endpoint
 // -------------------------------------------------------------------------------------------
