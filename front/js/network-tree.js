@@ -203,6 +203,32 @@ function emToPx(em, element) {
 }
 
 /**
+ * Return the depth of the deepest visible node below the given hierarchy node (root = 0).
+ * @param {Object} node - Hierarchy node built by getChildren()
+ * @returns {number} Maximum depth
+ */
+function getMaxDepth(node)
+{
+  let maxChildDepth = -1;
+  (node.children || []).forEach(child => {
+    maxChildDepth = Math.max(maxChildDepth, getMaxDepth(child));
+  });
+  return maxChildDepth + 1;
+}
+
+/**
+ * Clamp a number into the [min, max] range.
+ * @param {number} value - Value to clamp
+ * @param {number} min - Lower bound
+ * @param {number} max - Upper bound
+ * @returns {number} Clamped value
+ */
+function clampNumber(value, min, max)
+{
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
  * Initialize tree visualization
  * @param {Object} myHierarchy - Hierarchy object to render
  */
@@ -210,39 +236,30 @@ function initTree(myHierarchy)
 {
   if(myHierarchy && myHierarchy.type !== "")
   {
-    // calculate the drawing area based on the tree width and available screen size
-    let baseFontSize = parseFloat($('html').css('font-size'));
-    let treeAreaHeight = ($(window).height() - 155); ;
-    let minNodeWidth = 60 // min safe node width not breaking the tree
+    // EXPERIMENT (bounded hybrid layout): fixed readable node size, spacing derived
+    // from topology/canvas size but clamped, container width driven by CSS
+    let treeAreaHeight = ($(window).height() - 155);
+    let nodeHeightPx = 24;
+    let nodeWidthPx = 180;
+    let treeMargin = 10;
 
-    // calculate the font size of the leaf nodes to fit everything into the tree area
-    leafNodesCount == 0 ? 1 : leafNodesCount;
+    // port/icon inline styles are em-based relative to the (CSS-sized) node font
+    emSize = 1;
 
-    emSize = pxToEm((treeAreaHeight/(leafNodesCount)).toFixed(2));
+    // init the drawing area height; width comes from CSS so the SVG can follow browser resize
+    $("#networkTree").attr('style', `height:${treeAreaHeight}px`)
 
-    // let screenWidthEm = pxToEm($('.networkTable').width()-15);
-    let minTreeWidthPx = parentNodesCount * minNodeWidth;
-    let actualWidthPx = $('.networkTable').width() - 15;
+    // parent -> child distance, as a multiple of node width (Treeviz: depth * nodeWidth * spacing)
+    let maxDepth = Math.max(getMaxDepth(myHierarchy), 1);
+    let availableWidthPx = $("#networkTree").width() - 2 * treeMargin - nodeWidthPx;
+    let mainAxisSpacing = clampNumber(availableWidthPx / (maxDepth * nodeWidthPx), 1.5, 2.5);
 
-    let finalWidthPx = Math.max(actualWidthPx, minTreeWidthPx);
+    // sibling pitch, as a multiple of node height (d3 nodeSize). d3 gives each leaf one slot
+    // and adds one extra slot between neighbouring groups with different parents.
+    let verticalSlots = Math.max(leafNodesCount + parentNodesCount - 1, 1);
+    let secondaryAxisSpacing = clampNumber((treeAreaHeight - 2 * treeMargin) / (verticalSlots * nodeHeightPx), 1.25, 2.0);
 
-    // override original value
-    let screenWidthEm = pxToEm(finalWidthPx);
-
-    // handle canvas and node size if only a few nodes
-    emSize > 1 ? emSize = 1 : emSize = emSize;
-
-    let nodeHeightPx = emToPx(emSize*1);
-    let nodeWidthPx = emToPx(screenWidthEm / (parentNodesCount));
-
-    // handle if only a few nodes
-    nodeWidthPx > 160 ? nodeWidthPx = 160 : nodeWidthPx = nodeWidthPx;
-    if (nodeWidthPx < minNodeWidth) nodeWidthPx = minNodeWidth;  // minimum safe width
-
-    console.log("Calculated nodeWidthPx =", nodeWidthPx, "emSize =", emSize , " screenWidthEm:", screenWidthEm, " emToPx(screenWidthEm):" , emToPx(screenWidthEm));
-
-    // init the drawing area size
-    $("#networkTree").attr('style', `height:${treeAreaHeight}px; width:${emToPx(screenWidthEm)}px`)
+    console.log("Network layout: maxDepth =", maxDepth, " mainAxisSpacing =", mainAxisSpacing.toFixed(2), " secondaryAxisSpacing =", secondaryAxisSpacing.toFixed(2));
 
     console.log(Treeviz);
 
@@ -302,7 +319,7 @@ function initTree(myHierarchy)
 
         return result = `<div
                               class="node-inner hover-node-info box pointer ${highlightedCss} ${cssNodeType}"
-                              style="height:${nodeHeightPx}px;font-size:${nodeHeightPx-5}px;"
+                              style="height:${nodeHeightPx}px;"
                               onclick="handleNodeClick(this)"
                               data-mac="${nodeData.data.devMac}"
                               data-parentMac="${nodeData.data.devParentMAC}"
@@ -333,16 +350,16 @@ function initTree(myHierarchy)
                           </div>
                           ${collapseExpandHtml}`;
       },
-      mainAxisNodeSpacing: 'auto',
-      // secondaryAxisNodeSpacing: 0.3,
+      mainAxisNodeSpacing: mainAxisSpacing,
+      secondaryAxisNodeSpacing: secondaryAxisSpacing,
       nodeHeight: nodeHeightPx,
       nodeWidth: nodeWidthPx,
-      marginTop: '5',
+      marginTop: treeMargin,
       isHorizontal : true,
       hasZoom: true,
       hasPan: true,
-      marginLeft: '10',
-      marginRight: '10',
+      marginLeft: treeMargin,
+      marginRight: treeMargin,
       idKey: "devMac",
       hasFlatData: false,
       relationnalField: "children",
@@ -371,7 +388,7 @@ function initTree(myHierarchy)
         // return "<tspan><strong>reports to</strong></tspan>";
       },
       color: "#336c87ff",      // Label text color (optional)
-      fontSize: nodeHeightPx - 5           // Label font size in px (optional)
+      fontSize: 11           // Label font size in px (optional)
     },
       linkWidth: (nodeData) => 2,
       linkColor: (nodeData) => {
